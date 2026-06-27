@@ -21,7 +21,7 @@ scheduler_events = {
 #             "daily_timesheet_summary.scheduler.send_daily_summary"
 #         ]
 #     }
-# }
+}
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
