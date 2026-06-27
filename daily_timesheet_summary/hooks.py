@@ -11,8 +11,13 @@ app_license = "mit"
 # required_apps = []
 
 scheduler_events = {
+    # "cron": {
+    #     "0 19 * * *": [
+    #         "daily_timesheet_summary.scheduler.send_daily_summary"
+    #     ]
+    # }
     "cron": {
-        "0 19 * * *": [
+        "*/5 * * * *": [
             "daily_timesheet_summary.scheduler.send_daily_summary"
         ]
     }

@@ -3,7 +3,7 @@ from .utils import create_logger
 
 logger = create_logger()
 
-ADMIN_CHANNEL_NAME = "admin"  # change to your Raven channel name/id
+ADMIN_CHANNEL_NAME = "general"  # change to your Raven channel name/id
 
 
 def _resolve_channel(channel_name=ADMIN_CHANNEL_NAME):
