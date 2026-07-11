@@ -1,5 +1,5 @@
 import frappe
-from .aggregator import fetch_timesheets, aggregate
+from .aggregator import fetch_timesheets, aggregate, fetch_employee_stats
 from .formatter import format_per_employee_messages
 from .raven import send_message
 from .utils import create_logger
@@ -17,9 +17,13 @@ def send_daily_summary():
         summary = aggregate(rows)
         logger.info("Aggregation Completed")
 
-        messages = format_per_employee_messages(summary)
+        stats = fetch_employee_stats()
+        messages = format_per_employee_messages(summary, stats)
         if not messages:
-            send_message("📅 Daily Timesheet Summary\n\n_No timesheets submitted today._")
+            send_message(
+                "<p>📅 Daily Timesheet Summary</p>"
+                "<p><em>No timesheets submitted today.</em></p>"
+            )
         else:
             for message in messages:
                 send_message(message)

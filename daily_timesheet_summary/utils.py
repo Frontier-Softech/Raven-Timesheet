@@ -16,6 +16,11 @@ def format_hours(hours):
     return f"{hours:.2f}".rstrip("0").rstrip(".")
 
 
+def format_date(d):
+    """Format a date value as 'DD-Mon-YYYY' for display in messages."""
+    return getdate(d).strftime("%d-%b-%Y")
+
+
 def create_logger():
     """Return a frappe logger scoped to this app."""
     logger = frappe.logger("daily_timesheet_summary", allow_site=True, file_count=5)

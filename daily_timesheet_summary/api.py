@@ -1,7 +1,7 @@
 import frappe
 from .scheduler import send_daily_summary
-from .aggregator import fetch_timesheets, aggregate
-from .formatter import format_summary
+from .aggregator import fetch_timesheets, aggregate, fetch_employee_stats
+from .formatter import format_per_employee_messages
 
 
 @frappe.whitelist()
@@ -18,8 +18,9 @@ def preview_daily_summary():
     frappe.only_for("System Manager")
     rows = fetch_timesheets()
     summary = aggregate(rows)
+    stats = fetch_employee_stats()
     return {
         "row_count": len(rows),
         "total_hours": summary["total"],
-        "message": format_summary(summary),
+        "messages": format_per_employee_messages(summary, stats),
     }
