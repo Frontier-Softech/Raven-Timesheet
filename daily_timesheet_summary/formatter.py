@@ -15,20 +15,30 @@ def _badge(value, color):
     return f'<mark data-color="{color}" style="background-color: {color}"><strong>{value}</strong></mark>'
 
 
+GAP_ALERT_THRESHOLD = 5
+
+
 def format_per_employee_messages(summary, stats=None):
     """Return one formatted HTML message string per employee.
 
     Raven Message.text is rendered as HTML (Tiptap), not markdown/plain
     text, so lines must be wrapped in block tags to get line breaks and
-    user-supplied text must be escaped.
+    user-supplied text must be escaped. Each display line gets its own
+    <p> rather than <br>-joining multiple lines into one <p> — Tiptap
+    has been observed to drop <br> breaks inside a multi-line <p>,
+    collapsing lines together.
 
     Entries are grouped by the work date they were logged against, oldest
     first, so an entry filled today for yesterday's work is shown before
-    today's own entries.
+    today's own entries. An <hr> separates date blocks when an employee
+    has more than one, so backfilled/multi-day messages don't run
+    together.
 
     `stats`, if given, is { employee_name: {"present", "filled", "window_days"} }
     (see aggregator.fetch_employee_stats) and is rendered as a Present vs
-    Timesheet Filled comparison for the trailing window.
+    Timesheet Filled comparison for the trailing window. An employee whose
+    gap exceeds GAP_ALERT_THRESHOLD gets their name badge-colored red so
+    they stand out on a quick mobile scan.
     """
     employees = summary.get("employees") or {}
     stats = stats or {}
@@ -36,51 +46,63 @@ def format_per_employee_messages(summary, stats=None):
 
     for emp, emp_data in employees.items():
         emp_total = emp_data.get("total", 0)
-        blocks = [
-            f"<p><strong>{html.escape(emp)}</strong> "
-            f"<em>({format_hours(emp_total)} hrs)</em></p>"
-        ]
-
         emp_stats = stats.get(emp)
+        gap = None
+        if emp_stats:
+            gap = emp_stats.get("present", 0) - emp_stats.get("filled", 0)
+
+        name_html = html.escape(emp)
+        if gap is not None and gap > GAP_ALERT_THRESHOLD:
+            name_html = f'<mark data-color="{COLOR_RED}" style="background-color: {COLOR_RED}"><strong>{name_html}</strong></mark>'
+        else:
+            name_html = f"<strong>{name_html}</strong>"
+
+        blocks = [f"<p>{name_html} <em>({format_hours(emp_total)} hrs)</em></p>"]
+
         if emp_stats:
             window_days = emp_stats.get("window_days", 30)
             present = emp_stats.get("present", 0)
             filled = emp_stats.get("filled", 0)
-            gap = present - filled
-            filled_color = COLOR_GREEN if gap <= 0 else COLOR_RED
             gap_color = COLOR_GREEN if gap <= 0 else COLOR_RED
             blocks.append(
-                f"<p>📊 <em>Last {window_days} days</em> — "
-                f"Present: {_badge(present, COLOR_BLUE)} | "
-                f"Timesheet Filled: {_badge(filled, filled_color)} | "
+                f"<p><em>{window_days}d</em> — "
+                f"P: {_badge(present, COLOR_BLUE)} "
+                f"F: {_badge(filled, COLOR_BLUE)} "
                 f"Gap: {_badge(max(gap, 0), gap_color)}</p>"
             )
 
-        for work_date, date_data in emp_data.get("dates", {}).items():
+        dates = list(emp_data.get("dates", {}).items())
+        for idx, (work_date, date_data) in enumerate(dates):
+            if idx > 0:
+                blocks.append("<hr>")
+
             day_total = date_data.get("total", 0)
+            date_badge = f'<mark data-color="{COLOR_BLUE}" style="background-color: {COLOR_BLUE}">{html.escape(format_date(work_date))}</mark>'
             blocks.append(
-                f"<p><strong>Date: {html.escape(format_date(work_date))}</strong> "
+                f"<p>🗓 {date_badge} "
                 f"<em>({format_hours(day_total)} hrs)</em></p>"
             )
 
             for project, entries in date_data.get("projects", {}).items():
-                blocks.append(f"<p><strong>{html.escape(project)}</strong></p>")
+                blocks.append(f"<p><strong><em>{html.escape(project)}</em></strong></p>")
                 for entry in entries:
                     task = entry.get("task")
                     subject = entry.get("subject")
                     hours = entry.get("hours", 0)
                     descriptions = entry.get("descriptions", [])
 
-                    entry_lines = []
                     if task:
-                        task_label = subject if subject else task
-                        entry_lines.append(f"Task: {html.escape(task_label)}")
-                    entry_lines.append(f"Time: {format_hours(hours)} hrs")
+                        task_label = html.escape(subject if subject else task)
+                        blocks.append(
+                            f"<p>• <strong>{task_label}</strong> "
+                            f"<em>({format_hours(hours)}h)</em></p>"
+                        )
+                    else:
+                        blocks.append(f"<p>• <em>({format_hours(hours)}h)</em></p>")
+
                     if descriptions:
                         desc = html.escape("; ".join(descriptions)).replace("\n", "<br>")
-                        entry_lines.append(f"Description: {desc}")
-
-                    blocks.append(f"<p>{'<br>'.join(entry_lines)}</p>")
+                        blocks.append(f"<p><em>{desc}</em></p>")
 
         messages.append("".join(blocks))
 
